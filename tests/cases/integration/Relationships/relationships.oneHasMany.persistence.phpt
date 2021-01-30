@@ -8,11 +8,18 @@
 namespace NextrasTests\Orm\Integration\Relationships;
 
 
+use Nextras\Dbal\Drivers\Exception\ForeignKeyConstraintViolationException;
+use Nextras\Dbal\Drivers\Exception\NotNullConstraintViolationException;
+use Nextras\Orm\Mapper\Dbal\DbalMapper;
 use NextrasTests\Orm\Author;
 use NextrasTests\Orm\Book;
 use NextrasTests\Orm\DataTestCase;
+use NextrasTests\Orm\Helper;
 use NextrasTests\Orm\Publisher;
+use NextrasTests\Orm\User;
+use NextrasTests\Orm\UserStat;
 use Tester\Assert;
+use Tester\Environment;
 
 
 require_once __DIR__ . '/../../../bootstrap.php';
@@ -90,6 +97,35 @@ class RelationshipsOneHasManyPersistenceTest extends DataTestCase
 
 		$this->orm->flush();
 		Assert::same([$book], iterator_to_array($author->books));
+	}
+
+
+	public function testForeignKeyInNonConnectedRelationship()
+	{
+		if ($this->section === Helper::SECTION_ARRAY) {
+			Environment::skip('Only for DB with foreign key restriction');
+		}
+
+		$user = new User();
+		$user2 = new User();
+		$user->friendsWithMe->add($user2);
+		$userStat = new UserStat();
+		$userStat->user = $user;
+		$userStat->date = 'now';
+		$userStat->value = 3;
+		$this->orm->persistAndFlush($userStat);
+
+		try {
+			$this->orm->removeAndFlush($user);
+		} catch (ForeignKeyConstraintViolationException $e) {
+			/** @var DbalMapper $mapper */
+			$mapper = $this->orm->userStats->getMapper();
+			$mapper->rollback();
+			$this->orm->refreshAll();
+		}
+
+		$friends = iterator_to_array($user->friendsWithMe);
+		Assert::same(1, count($friends));
 	}
 }
 
