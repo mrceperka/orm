@@ -7,6 +7,7 @@ use Nette\DI\Container;
 use Nextras\Orm\Entity\IEntity;
 use Nextras\Orm\Model\IRepositoryLoader;
 use Nextras\Orm\Repository\IRepository;
+use ReflectionClass;
 
 
 /**
@@ -82,9 +83,16 @@ class DiRepositoryLoader implements IRepositoryLoader
 	{
 		$repositories = [];
 		foreach ($this->repositoryClassNameToDiNameMap as $diName) {
-			if ($this->container->isCreated($diName)) {
-				$repositories[] = $this->container->getService($diName);
+			if (!$this->container->isCreated($diName)) {
+				continue;
 			}
+			$repository = $this->container->getService($diName);
+			// An uninitialized lazy object (Nette DI lazy services) holds no entities nor pending changes;
+			// returning it would only initialize it (and its mapper) for nothing.
+			if (PHP_VERSION_ID >= 80400 && (new ReflectionClass($repository))->isUninitializedLazyObject($repository)) {
+				continue;
+			}
+			$repositories[] = $repository;
 		}
 		return $repositories;
 	}
