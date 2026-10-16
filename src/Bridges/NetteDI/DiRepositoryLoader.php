@@ -89,7 +89,7 @@ class DiRepositoryLoader implements IRepositoryLoader
 			$repository = $this->container->getService($diName);
 			// An uninitialized lazy object (Nette DI lazy services) holds no entities nor pending changes;
 			// returning it would only initialize it (and its mapper) for nothing.
-			if (PHP_VERSION_ID >= 80400 && (new ReflectionClass($repository))->isUninitializedLazyObject($repository)) {
+			if (PHP_VERSION_ID >= 80400 && (new ReflectionClass($repository))->isUninitializedLazyObject($repository)) { // @phpstan-ignore method.notFound (PHP 8.4+)
 				continue;
 			}
 			$repositories[] = $repository;

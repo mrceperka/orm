@@ -45,7 +45,7 @@ function buildDic(string $config): Container
 
 function isLazy(object $object): bool
 {
-	return (new ReflectionClass($object))->isUninitializedLazyObject($object);
+	return (new ReflectionClass($object))->isUninitializedLazyObject($object); // @phpstan-ignore method.notFound (PHP 8.4+)
 }
 
 
