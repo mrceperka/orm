@@ -9,6 +9,7 @@ use Nette\DI\ContainerBuilder;
 use Nette\DI\Definitions\Reference;
 use Nette\DI\Definitions\ServiceDefinition;
 use Nette\DI\Definitions\Statement;
+use Nette\DI\Extensions\DIExtension;
 use Nette\Schema\Expect;
 use Nette\Schema\Schema;
 use Nextras\Dbal\IConnection;
@@ -19,7 +20,9 @@ use Nextras\Orm\Model\IModel;
 use Nextras\Orm\Model\MetadataStorage;
 use Nextras\Orm\Model\Model;
 use stdClass;
+use function is_object;
 use function is_subclass_of;
+use function property_exists;
 
 
 /**
@@ -44,7 +47,7 @@ class OrmExtension extends CompilerExtension
 			'model' => Expect::string()->default(Model::class),
 			'extensions' => Expect::arrayOf('string|Nette\DI\Definitions\Statement')->default([]),
 			'repositoryFinder' => Expect::string()->default(PhpDocRepositoryFinder::class),
-			'initializeMetadata' => Expect::bool()->default(false),
+			'initializeMetadata' => Expect::bool()->nullable(), // null = enabled when Nette DI's lazy services are enabled
 			'autowiredInternalServices' => Expect::bool()->default(true),
 			'connection' => Expect::string(),
 		]);
@@ -277,10 +280,32 @@ class OrmExtension extends CompilerExtension
 
 	protected function initializeMetadata(): void
 	{
-		if (!$this->config->initializeMetadata) return;
-		// getMetadata() to force initialization when Nette DI's lazy proxies are enabled.
-		$this->initialization->addBody('$this->getService(?)->getLoadedMetadata();', [
+		$initializeMetadata = $this->config->initializeMetadata ?? $this->isDiLazyEnabled();
+		if (!$initializeMetadata) return;
+
+		// Calling a method on a lazy ghost does not initialize it unless an instance property is accessed,
+		// MetadataStorage works only with static state, therefore the service must not be lazy at all.
+		$metadataStorage = $this->builder->getDefinition($this->prefix('metadataStorage'));
+		// @phpstan-ignore function.alreadyNarrowedType (ServiceDefinition::$lazy does not exist in nette/di 3.1)
+		if ($metadataStorage instanceof ServiceDefinition && property_exists($metadataStorage, 'lazy')) {
+			$metadataStorage->lazy = false;
+		}
+
+		$this->initialization->addBody('$this->getService(?);', [
 			$this->prefix('metadataStorage'),
 		]);
+	}
+
+
+	private function isDiLazyEnabled(): bool
+	{
+		if (PHP_VERSION_ID < 80400) return false;
+		foreach ($this->compiler->getExtensions(DIExtension::class) as $extension) {
+			$config = $extension->getConfig();
+			if (is_object($config) && ($config->lazy ?? false) === true) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

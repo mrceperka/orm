@@ -75,6 +75,8 @@
 
   The `configureModel`/`configureRepository`/`configureMapper` hooks run when the respective service is instantiated; the `configureEntityMetadata`/`configureEntityPropertyMetadata` hooks run at compile time while entity metadata is parsed (before it is cached).
 
+- **Nette DI lazy services support** - with `di: lazy: true` (PHP 8.4+), the `initializeMetadata` option is now enabled by default and actually creates the metadata storage, so `new Entity()` works without touching the model first. The previous workaround (`initializeMetadata: true` together with `nextras.orm.metadataStorage: lazy: false`) still works but is not needed anymore. Set `initializeMetadata: false` to opt out.
+
 - **`#[\NoDiscard]` on read-only API** - methods that only compute and return a value are marked with PHP 8.5's `#[\NoDiscard]` attribute; most notably the whole `ICollection` API, but also `IRepository`, `IModel`, `IMapper`, `IEntity` and relationship getters.
 
   On PHP 8.5 and newer, PHP reports a warning when such a call's return value is thrown away. This catches the classic mistake of treating the immutable collection as a mutable one:
